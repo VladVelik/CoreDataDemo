@@ -27,7 +27,7 @@ class TaskListViewController: UITableViewController {
     
     func showAlert(task: Task? = nil, completion: (() -> Void)? = nil) {
         let title = task != nil ? "Update Task" : "New Task"
-        let alert = UIAlertController.createAlertController(withTitle: title)
+        let alert = UIAlertController(title: title, message: "What do you want to do?", preferredStyle: .alert)
         
         alert.action(task: task) { [weak self] taskName in
             if let task = task, let completion = completion {
@@ -79,7 +79,7 @@ class TaskListViewController: UITableViewController {
         StorageManager.shared.fetchData { [unowned self] result in
             switch result {
             case .success(let tasks):
-                self.taskList = tasks
+                taskList = tasks
             case .failure(let error):
                 print(error.localizedDescription)
             }
@@ -101,6 +101,7 @@ extension TaskListViewController {
     override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
         taskList.count
     }
+    
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = tableView.dequeueReusableCell(withIdentifier: cellID, for: indexPath)
         
@@ -113,7 +114,6 @@ extension TaskListViewController {
 }
 
 extension TaskListViewController {
-    // Edit task
     override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         tableView.deselectRow(at: indexPath, animated: true)
         let task = taskList[indexPath.row]
@@ -121,8 +121,7 @@ extension TaskListViewController {
             tableView.reloadRows(at: [indexPath], with: .automatic)
         }
     }
-    
-    // Delete task
+
     override func tableView(_ tableView: UITableView, commit editingStyle: UITableViewCell.EditingStyle, forRowAt indexPath: IndexPath) {
         if editingStyle == .delete {
             let task = taskList.remove(at: indexPath.row)
