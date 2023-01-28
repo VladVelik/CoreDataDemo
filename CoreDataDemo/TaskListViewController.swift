@@ -6,12 +6,8 @@
 //
 
 import UIKit
-import CoreData
 
 class TaskListViewController: UITableViewController {
-    
-    private let context = (UIApplication.shared.delegate as! AppDelegate).persistentContainer.viewContext
-    
     private let cellID = "task"
     private var taskList: [Task] = []
 
@@ -27,6 +23,22 @@ class TaskListViewController: UITableViewController {
         super.viewWillAppear(animated)
         fetchData()
         tableView.reloadData()
+    }
+    
+    func showAlert(task: Task? = nil, completion: (() -> Void)? = nil) {
+        let title = task != nil ? "Update Task" : "New Task"
+        let alert = UIAlertController.createAlertController(withTitle: title)
+        
+        alert.action(task: task) { [weak self] taskName in
+            if let task = task, let completion = completion {
+                StorageManager.shared.update(task, newName: taskName)
+                completion()
+            } else {
+                self?.save(taskName: taskName)
+            }
+        }
+        
+        present(alert, animated: true)
     }
 
     private func setupNavigationBar() {
@@ -60,16 +72,27 @@ class TaskListViewController: UITableViewController {
     }
     
     @objc private func addNewTask() {
-        showAlert(with: "New Task", and: "What do you want to do?")
+        showAlert()
     }
     
     private func fetchData() {
-        let fetchRequest = Task.fetchRequest()
-        
-        do {
-            taskList = try context.fetch(fetchRequest)
-        } catch {
-            print("Failed to fetch data", error)
+        StorageManager.shared.fetchData { [unowned self] result in
+            switch result {
+            case .success(let tasks):
+                self.taskList = tasks
+            case .failure(let error):
+                print(error.localizedDescription)
+            }
+        }
+    }
+    
+    private func save(taskName: String) {
+        StorageManager.shared.create(taskName) { [unowned self] task in
+            taskList.append(task)
+            tableView.insertRows(
+                at: [IndexPath(row: self.taskList.count - 1, section: 0)],
+                with: .automatic
+            )
         }
     }
 }
@@ -90,35 +113,21 @@ extension TaskListViewController {
 }
 
 extension TaskListViewController {
-    private func showAlert(with title: String, and messege: String) {
-        let alert = UIAlertController(title: title, message: messege, preferredStyle: .alert)
-        
-        let saveAction = UIAlertAction(title: "Save", style: .default) { _ in
-            guard let task = alert.textFields?.first?.text, !task.isEmpty else { return }
-            self.save(task)
+    // Edit task
+    override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
+        tableView.deselectRow(at: indexPath, animated: true)
+        let task = taskList[indexPath.row]
+        showAlert(task: task) {
+            tableView.reloadRows(at: [indexPath], with: .automatic)
         }
-        let cancelAction = UIAlertAction(title: "Cancel", style: .destructive)
-        alert.addAction(saveAction)
-        alert.addAction(cancelAction)
-        alert.addTextField { textField in
-            textField.placeholder = "New Task"
-        }
-        
-        present(alert, animated: true)
     }
     
-    private func save(_ taskName: String) {
-        let task = Task(context: context)
-        task.name = taskName
-        taskList.append(task)
-        
-        let cellIndex = IndexPath(row: taskList.count - 1, section: 0)
-        tableView.insertRows(at: [cellIndex], with: .automatic)
-        
-        do {
-            try context.save()
-        } catch {
-            print(error)
+    // Delete task
+    override func tableView(_ tableView: UITableView, commit editingStyle: UITableViewCell.EditingStyle, forRowAt indexPath: IndexPath) {
+        if editingStyle == .delete {
+            let task = taskList.remove(at: indexPath.row)
+            tableView.deleteRows(at: [indexPath], with: .automatic)
+            StorageManager.shared.delete(task)
         }
     }
 }
